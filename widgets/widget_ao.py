@@ -8,6 +8,7 @@ with 'parameters_filename' the path to the parameters file
 Options:
   -h --help          Show this help message and exit
   --brama            Distribute data with BRAMA
+  --cacao            Distribute data on CACAO SHM
   --expert           Display expert panel
   -d, --devices devices      Specify the devices
 """
@@ -55,11 +56,12 @@ WindowTemplate, TemplateBaseClass = loadUiType(
 
 class widgetAOWindow(TemplateBaseClass):
 
-    def __init__(self, configFile: Any=None, BRAMA: bool=False, expert: bool=False,
-                 devices: str=None) -> None:
+    def __init__(self, configFile: Any=None, BRAMA: bool=False, CACAO: bool=False,
+                 expert: bool=False, devices: str=None) -> None:
         TemplateBaseClass.__init__(self)
 
         self.BRAMA = BRAMA
+        self.CACAO = CACAO
         self.rollingWindow = 100
         self.SRLE = deque(maxlen=self.rollingWindow)
         self.SRSE = deque(maxlen=self.rollingWindow)
@@ -658,7 +660,9 @@ class widgetAOWindow(TemplateBaseClass):
             self.viewboxes[name] = viewbox
             iv = pg.ImageView(view=viewbox, imageItem=img)
 
-            iv.ui.histogram.hide()
+            #iv.ui.histogram.hide()
+            iv.ui.histogram.setFixedWidth(100)
+            iv.ui.histogram.autoHistogramRange()
             iv.ui.menuBtn.hide()
             iv.ui.roiBtn.hide()
             d.addWidget(iv)
@@ -686,6 +690,8 @@ class widgetAOWindow(TemplateBaseClass):
         if self.sim is None:
             if self.BRAMA:
                 self.sim = shesha_sim.SimulatorBrama(configFile)
+            elif self.CACAO:
+                self.sim = shesha_sim.SimulatorCACAO(configFile)
             else:
                 self.sim = shesha_sim.Simulator(configFile)
         else:
@@ -1317,5 +1323,6 @@ if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     app.setStyle('cleanlooks')
     wao = widgetAOWindow(arguments["<parameters_filename>"], BRAMA=arguments["--brama"],
-                         expert=arguments["--expert"], devices=arguments["--devices"])
+                         CACAO=arguments["--cacao"], expert=arguments["--expert"],
+                         devices=arguments["--devices"])
     wao.show()

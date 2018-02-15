@@ -306,8 +306,7 @@ class Simulator:
         if move_atmos:
             self.atm.move_atmos()
 
-        if (
-                self.config.p_controllers is not None and
+        if (self.config.p_controllers is not None) and (
                 self.config.p_controllers[nControl].type == scons.ControllerType.GEO):
             for t in tar_trace:
                 if see_atmos:
@@ -335,11 +334,12 @@ class Simulator:
                 if not self.config.p_wfss[w].openloop:
                     self.wfs.raytrace(w, b"dm", dms=self.dms)
                 self.wfs.comp_img(w)
-            self.rtc.do_centroids(nControl)
-            self.rtc.do_control(nControl)
-            self.rtc.do_clipping(0, -1e5, 1e5)
-            if apply_control:
-                self.rtc.apply_control(nControl, self.dms)
+            if self.config.p_controllers is not None:
+                self.rtc.do_centroids(nControl)
+                self.rtc.do_control(nControl)
+                self.rtc.do_clipping(nControl, -1e5, 1e5)
+                if apply_control:
+                    self.rtc.apply_control(nControl, self.dms)
         self.iter += 1
 
     def loop(self, n=1, monitoring_freq=100, **kwargs):

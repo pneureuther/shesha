@@ -8,6 +8,7 @@ with 'parameters_filename' the path to the parameters file
 Options:
   -h --help          Show this help message and exit
   --brama            Distribute data with BRAMA
+  --cacao            Distribute data on CACAO SHM
   --bench            For a timed call
   -d, --devices devices      Specify the devices
 """
@@ -24,6 +25,8 @@ if arguments["--bench"]:
     sim = shesha_sim.Bench(param_file)
 elif arguments["--brama"]:
     sim = shesha_sim.SimulatorBrama(param_file)
+elif arguments["--cacao"]:
+    sim = shesha_sim.SimulatorCACAO(param_file)
 else:
     sim = shesha_sim.Simulator(param_file)
 
@@ -33,4 +36,4 @@ if arguments["--devices"]:
     ])
 
 sim.init_sim()
-sim.loop(sim.config.p_loop.niter)
+# sim.loop(sim.config.p_loop.niter)
