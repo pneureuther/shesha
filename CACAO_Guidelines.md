@@ -26,7 +26,7 @@ export CACAO_ROOT=$HOME/cacao
 ## Anaconda installation
 
 For an easier maintenance, I recommend the use of anaconda.
-You can also use virtualenv to have a python sandbox but I can't help you.
+You can also use virtualenv to have a python sandbox, but I can't help you.
 
 ```bash
 cd $HOME
@@ -96,7 +96,7 @@ If you don't need displays, you can also use the close_loop.py script
 
 COMPASS provides simulated frames in the SHM names ``compass_wfs0``, ``compass_wfs1``, ... In SCAO, we will use only ``compass_wfs0``.
 
-Simulated DM shape in computed from command vectors written in the SHM ``compass_dm0``, ``compass_dm1``, ... In SCAO, we will use only ``compass_dm0``.
+Simulated DM shape is computed from command vectors written in the SHM ``compass_dm0``, ``compass_dm1``, ... In SCAO, we will use only ``compass_dm0``.
 
 ``compass_wfs0`` and ``compass_dm0`` are defined in the ``data/par/CACAO/scao_pyrhr_40x40.py``:
 
