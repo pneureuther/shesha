@@ -88,7 +88,7 @@ ipython -i widgets/widget_ao.py data/par/CACAO/scao_pyrhr_40x40.py -- --cacao -d
 
 note: the flag ``-d 0`` impose compass to use GPU0 only.
 
-More information to use the widget: https://anr-compass.github.io/compass/manual.html#5-using-the-gui
+More information on the widget: https://anr-compass.github.io/compass/manual.html#5-using-the-gui
 
 If you don't need displays, you can also use the close_loop.py script
 
