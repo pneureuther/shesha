@@ -1,0 +1,68 @@
+################################################################################################
+				INSTRUCTIONS FOR THE "MAT LOGGER" UTILITY OF COMPASS
+################################################################################################
+
+"Mat Logger" stores the values of COMPASS-variables every time step in a mat-file. The created 
+file is a version 7.3 mat-file, which is a modification of a hdf5-file and can be easily readout 
+(e.g. with Python).
+
+################################################################################################
+
+SETTINGS (ALL OPTIONAL):
+
+log_mat         variables are saved to mat-file if true						boolean
+log_init        variables after initialization are saved if true			boolean
+mat_file_dir    directory of (to be created) mat-file						string
+mat_file_name   file-name of (to be created) mat-file						string
+mat_num_dig     number of digits used in the mat-file variables				integer
+mat_var         list of variable names used in (to be created) mat-file		list of strings
+mat_cmds        list of COMPASS commands used to retrieve desired data		list of strings
+
+################################################################################################
+
+EXAMPLE FOR PARAM-FILE:
+
+[...]
+p_matlog = conf.Param_mat_logger()
+p_matlog.set_log_mat(True)
+p_matlog.set_log_init(True)
+p_matlog.set_mat_file_dir("/home/smith/Documents/COMPASS_Sim/")
+p_matlog.set_mat_file_name("COM_Mat_Test.mat")
+p_matlog.set_mat_num_dig(3)
+p_matlog.set_mat_var(["centroid","voltage"])
+p_matlog.set_mat_cmds(["sim.rtc.get_centroids(0)","sim.rtc.get_voltage(0)"])
+[...]
+
+Resulting mat-file:
+	Directory:	/home/smith/Documents/COMPASS_Sim/COM_Mat_Test.mat
+	Content:	centroid000 (= sim.rtc.get_centroids(0) after initialization)
+				centroid001 (= sim.rtc.get_centroids(0) after 1. step)
+				centroid002 (= sim.rtc.get_centroids(0) after 2. step)
+				centroid003 (= sim.rtc.get_centroids(0) after 3. step)
+				centroid004 (= sim.rtc.get_centroids(0) after 4. step)
+				[...]
+				
+				voltage000 (= sim.rtc.get_voltage(0) after initialization)
+				voltage001 (= sim.rtc.get_voltage(0) after 1. step)
+				voltage002 (= sim.rtc.get_voltage(0) after 2. step)
+				voltage003 (= sim.rtc.get_voltage(0) after 3. step)
+				voltage004 (= sim.rtc.get_voltage(0) after 4. step)
+				[...]
+ 
+################################################################################################
+
+BEHAVIOUR AND REMARKS:
+
+- Package hdf5storage is REQUIRED
+- If no setting-variables are set, then "Mat Logger" neither saves any COMPASS-variables nor
+  creates a mat-file.
+- If "Mat Logger" is enabled, the mat_file_dir and mat_file_name settings must be set manually.
+- The mat_num_dig must be sufficient to store all simulation steps.
+- "Mat Logger" checks if the specified mat-file already exists and asks if it should be
+  overwritten.
+- All COMPASS commands specified in mat_cmds must start with "sim" as the Simulator object.
+- This utility only works for
+	* terminal-based COMPASS calls
+	* simulations with fixed and finite number of loop iterations
+	* simulations with ONE call of simulator.loop
+

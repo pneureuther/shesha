@@ -26,6 +26,12 @@ import time
 from typing import Iterable, Any, Dict
 from shesha.sutra_bind.wrap import naga_context, Sensors, Dms, Rtc, Atmos, Telescope, Target
 
+# new packages
+import shesha.util.mat_log as mat_log
+import shesha.util.z_aberration as z_aber
+import shesha.util.t_control as t_ctrl
+import numpy as np
+
 
 class Simulator:
     """
@@ -176,6 +182,12 @@ class Simulator:
         if self.use_DB:
             h5u.validDataBase(os.environ["SHESHA_ROOT"] + "/data/dataBase/",
                               self.matricesToLoad)
+        
+        self._t_control_init()
+        
+        self._z_aberration_init()
+        
+        self._mat_logging_init()
 
     def _tel_init(self, r0: float, ittime: float) -> None:
         """
@@ -251,6 +263,38 @@ class Simulator:
                     use_DB=self.use_DB)
         else:
             self.rtc = None
+    
+    def _mat_logging_init(self):
+        """
+        Initializes the logging of variables in a mat-file
+        """
+        mat_log.mat_file_init(log_mat = self.config.p_matlog.log_mat, 
+                              mat_file_name = self.config.p_matlog.mat_file_name, 
+                              mat_file_dir = self.config.p_matlog.mat_file_dir, 
+                              mat_var = self.config.p_matlog.mat_var,
+                              bool_log_init = self.config.p_matlog.log_init)
+        
+        # save variables (after initialization) in mat-file
+        if self.config.p_matlog.log_mat and self.config.p_matlog.log_init:
+            mat_log.mat_file_write(log_mat = self.config.p_matlog.log_mat, 
+                                   mat_file_name = self.config.p_matlog.mat_file_name, 
+                                   mat_file_dir = self.config.p_matlog.mat_file_dir, 
+                                   mat_num_dig = self.config.p_matlog.mat_num_dig, 
+                                   mat_var = self.config.p_matlog.mat_var, 
+                                   mat_cmds = self.config.p_matlog.mat_cmds, 
+                                   index = -1, sim = self)
+    
+    def _z_aberration_init(self):
+        """
+        Initializes the custom zernike aberrations (in pupil)
+        """
+        z_aber.init_z_aber(self)
+    
+    def _t_control_init(self):
+        """
+        Initializes the Time Control utility (enabling oversampling)
+        """
+        t_ctrl.t_ctrl_init(self)
 
     def next(self, *, move_atmos: bool=True, see_atmos: bool=True, nControl: int=0,
              tar_trace: Iterable[int]=None, wfs_trace: Iterable[int]=None,
@@ -309,9 +353,15 @@ class Simulator:
         if do_control:
             self.rtc.do_centroids(nControl)
             self.rtc.do_control(nControl)
+            # Test
+            # self.rtc.set_com(0,np.random.randn(self.config.p_dms[0]._ntotact + self.config.p_dms[1]._ntotact,1).astype('float32').ravel())
+            # cmd_mat = np.zeros((self.config.p_dms[0]._ntotact + self.config.p_dms[1]._ntotact,1), dtype = 'float32').ravel()
+            # cmd_mat[self.iter] = 1
+            # self.rtc.set_com(0,cmd_mat)
             self.rtc.do_clipping(0, -1e5, 1e5)
             if apply_control:
                 self.rtc.apply_control(nControl, self.dms)
+        
         self.iter += 1
 
     def print_strehl(self, monitoring_freq: int, t1: float, nCur: int=0, nTot: int=0,
@@ -323,14 +373,20 @@ class Simulator:
         print("%d \t %.3f \t  %.3f\t     %.1f \t %.1f" % (nCur + 1, strehltmp[0],
                                                           strehltmp[1], etr, framerate))
 
-    def loop(self, n: int=1, monitoring_freq: int=100, **kwargs):
+    def loop(self, n: int=1, monitoring_freq: int=100, save_index: int=0,
+             phase_index: int=1, **kwargs):
         """
         Perform the AO loop for n iterations
 
         :parameters:
             n: (int): (optional) Number of iteration that will be done
             monitoring_freq: (int): (optional) Monitoring frequency [frames]
+            save_index: (int): (optional) start index for mat-file-logging
+            phase_index: (int): (optional) start index of phasescreen aberrations
         """
+        self.config.p_z_ab.set_phase_index(phase_index)
+        self.config.p_matlog.set_save_index(save_index)
+        
         print("----------------------------------------------------")
         print("iter# | S.E. SR | L.E. SR | ETR (s) | Framerate (Hz)")
         print("----------------------------------------------------")
@@ -346,14 +402,69 @@ class Simulator:
                 i += 1
 
         for i in range(n):
+            # Iterate optical system
             self.next(**kwargs)
+            
+            # additional commands executed after every iteration
+            self.loop_addition(i+1)
+            
+            # show simulation progress
             if ((i + 1) % monitoring_freq == 0):
                 self.print_strehl(monitoring_freq, time.time() - t1, i, n)
                 t1 = time.time()
+            
         t1 = time.time()
         print(" loop execution time:", t1 - t0, "  (", n, "iterations), ", (t1 - t0) / n,
               "(mean)  ", n / (t1 - t0), "Hz")
-
+    
+    def loop_addition(self, it_index):
+        # update of Time control
+        if self.config.p_t_ctrl.os_dec > 1:
+            
+            # cumulate wfs images
+            t_ctrl.add_sub_images(self)
+            
+            # upload wfs images to GPU
+            t_ctrl.upload_images(self)
+            
+            # set modulation points for next sub-cycle
+            t_ctrl.update_pyr_mod(self)
+            
+            # update loop_it and main_cnt after for next sub-cycle
+            t_ctrl.update_idx(self)
+            
+        
+        # update of Zernike aberration
+        if self.config.p_z_ab.include_zab and (it_index % self.config.p_z_ab.dec == 0):
+            # calculate and set phase-screen for spupil
+            if (self.config.p_z_ab.include_path == 1) or (self.config.p_z_ab.include_path == 3):
+                self.tel.set_phase_ab_M1( z_aber.calc_phase_screen(
+                        cube = self.config.p_z_ab.zcube_spup,
+                        coeff = self.config.p_z_ab.coeff_series[self.config.p_z_ab.phase_index,:],
+                        n_zpol = self.config.p_z_ab.num_zpol) )
+            
+            # calculate and set phase-screen for mpupil
+            if (self.config.p_z_ab.include_path == 2) or (self.config.p_z_ab.include_path == 3):
+                self.tel.set_phase_ab_M1_m( z_aber.calc_phase_screen(
+                        cube = self.config.p_z_ab.zcube_mpup,
+                        coeff = self.config.p_z_ab.coeff_series[self.config.p_z_ab.phase_index,:],
+                        n_zpol = self.config.p_z_ab.num_zpol) )
+            
+            self.config.p_z_ab.phase_index += 1
+        
+        # save variables in mat-file
+        if self.config.p_matlog.log_mat:
+            mat_log.mat_file_write(log_mat = self.config.p_matlog.log_mat, 
+                                   mat_file_name = self.config.p_matlog.mat_file_name, 
+                                   mat_file_dir = self.config.p_matlog.mat_file_dir, 
+                                   mat_num_dig = self.config.p_matlog.mat_num_dig, 
+                                   mat_var = self.config.p_matlog.mat_var, 
+                                   mat_cmds = self.config.p_matlog.mat_cmds, 
+                                   index = self.config.p_matlog.save_index, sim = self)
+            
+            self.config.p_matlog.save_index += 1
+        
+        
 
 def load_config_from_file(sim_class, filepath: str) -> None:
     """
