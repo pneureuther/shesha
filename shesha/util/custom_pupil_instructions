@@ -1,0 +1,322 @@
+How to import a customized pupil with make_pupil.
+
+@author: hadorn
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+So far, compass builds its own pupils based on user-defined inputs and
+parameter. The function "pupil_resize" from "import_custom_pupil.py" allows to 
+import and scale a custom pupil from .mat datas.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+def pupil_resize(desired_size, p_custom_pupil):
+    
+    Inputs: 
+        desired_size : (double) : Scaling of the resulting pupil 
+        p_custom_pupil : (obj.) : Parameter object of custom pupil
+ 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+How to implement the function.
+
+
+1. Define new parameter class "PCUSTOMPUPIL.py"  in the subfolder .../shesha/config
+    
+
+class Param_custom_pupil:
+
+    def __init__(self):
+        """ import pupil"""
+        self.__import_pupil = False
+        
+        """ pupil name in .mat file"""
+        self.__custom_pupil_name = None
+        
+        """ folder of custom pupil file"""
+        self.__custom_pupil_path = None
+        
+        """ boolean variable for showing the pupil"""
+        self.__show_pupil = False
+        
+    def set_import_pupil(self, imp_pupil, p_tel):
+        """ determine if a image of the pupil is wanted
+
+        :param img: (boolean) : show pupil
+        :param p_tel: (telescope object) : object of telescope class"""
+        
+        if type(imp_pupil) != bool:
+            raise TypeError("import_pupil must be a boolean.")
+
+        self.__import_pupil = imp_pupil
+        
+        # set custom pupil aperture type
+        if imp_pupil == True:
+            
+            p_tel.set_type_ap(b'Custom-Pupil')  
+    
+    import_pupil = property(lambda x: x.__import_pupil, set_import_pupil)    
+    
+    def set_custom_pupil_name(self, name):
+        """ Set the pupil name in .mat file
+
+        :param name: (string) : name of pupil in .mat file """
+        
+        if type(name) != str:
+            raise TypeError("custom_pupil_name must be a string.")
+        
+        self.__custom_pupil_name = name
+
+    custom_pupil_name = property(lambda x: x.__custom_pupil_name, set_custom_pupil_name)
+
+    def set_custom_pupil_path(self, path):
+        """ Set path of the .mat file
+
+        :param path: (string) : path to directory of .mat file """
+        
+        if type(path) != str:
+            raise TypeError("custom_pupil_path must be a string.")
+        
+        self.__custom_pupil_path = path
+    
+    custom_pupil_path = property(lambda x: x.__custom_pupil_path, set_custom_pupil_path)   
+    
+    def set_show_pupil(self, img):
+        """ determine if a image of the pupil is wanted
+
+        :param img: (boolean) : show pupil"""
+        
+        if type(img) != bool:
+            raise TypeError("img must be a boolean.")
+        
+        self.__show_pupil = img
+    
+    show_pupil = property(lambda x: x.__show_pupil, set_show_pupil)
+        
+        
+        This class allows to set the path of the custom pupil from an external
+        directory.
+    
+
+2. Add the new parameter class defined in the first step to the "init"-file in 
+   .../shesha/config/__init__.py   
+    
+        
+        __all__ = [ 
+        'PATMOS', 'PDMS', ... ,'PCUSTOMPUPIL' ]
+
+
+        from .PATMOS import Param_atmos
+        from .PDMS import Param_dm
+        
+        ...
+        
+        from .PCUSTOMPUPIL import Param_custom_pupil   
+        
+        
+3. It is necessary to define a new aperture type s.t. the customized pupil will 
+   used from compass. Therefor go to .../shesha/constants.py and extend
+   
+   
+       class ApertureType:
+        """
+            Telescope apertures
+        """
+        GENERIC = b'Generic'
+        
+        ...
+        
+        CUSTOM_PUPIL = b'Custom-Pupil'
+   
+   
+   by a new aperture type, here CUSTOM_PUPIL.
+   
+
+4. Extend the "make_pupil" function by the given "pupil_resize function". Therefore
+   import "import_custom_pupil.py" in "make_pupil.py":
+   
+   
+       from shesha. ... .import_custom_pupil as cp
+   
+   
+   Furthermore add a "p_custom_pupil" object to the inputs of "make_pupil"
+   
+   
+      def make_pupil(dim, pupd, tel, p_custom_pupil, xc=-1, yc=-1, 
+          real=0): 
+           
+          """
+          ...
+           
+          p_custom_pupil: (obj) : parameter object of custom pupil
+            
+          """
+           
+           
+    and implement a new if condition in the function s.t. if the defined 
+    aperture type from step 3 is chosen, a customized pupil will be imported 
+    and rescaled
+        
+        ...
+        
+       'new custom aperture type'
+        elif tel.type_ap == ApertureType.CUSTOM_PUPIL:
+            return pupil_resize(dim, p_custom_pupil)                                        
+        ...
+        
+    Here "make_pupil" checks which aperture type was defined and then it returns
+    the imported pupil.      
+
+        
+5. Go to the definition of "make_phase_ab" in "make_pupil.py" and change the 
+   first if-condition s.t.
+   
+   
+       if ((tel.type_ap == ApertureType.GENERIC) or 
+          (tel.type_ap == ApertureType.VLT) or 
+          (tel.type_ap == ApertureType.CUSTOM_PUPIL)):
+            
+            return np.zeros((dim, dim)).astype(np.float32)
+          
+        
+6. The next step is to change all function calls of "make_pupil". Go to "geom_init.py"
+   in .../shehsa/init. The function "make_pupil" is called in the function 
+   "geom_init". Here change the code s.t.
+   
+   
+       p_geom._spupil = mkP.make_pupil(p_geom.pupdiam, p_geom.pupdiam, p_tel, 
+           p_custom_pupil ,cent, cent).astype(np.float32)
+    
+    
+   The new parmater "p_custom_pupil" states for the object of a custom pupil. 
+   Additional the header of "geom_init" has to be extended by "p_custom_pupil"
+   
+       
+       def geom_init(p_geom: conf.Param_geom, p_tel: conf.Param_tel, 
+            p_custom_pupil: conf.Param_custom_pupil, padding=2):
+           
+        """
+            Initialize the system geometry
+    
+        :parameters:
+            p_geom: (Param_geom) : geometry settings
+            p_tel: (Param_tel) : telescope settings
+            p_custom_pupil: (obj) : parameter object of custom pupil
+            padding: (optional) : padding factor for PYRHR geometry
+            
+        """
+
+7. Now change all function calls of 
+   
+   geom_init(p_geom, p_tel, p_custom_pupil: conf.Param_custom_pupil,...) 
+   
+   in the functions "tel_init(...)" and "init_wfs_geom(...)". Therefor the headers 
+   of both functions have to be changed in a way s.t.
+   
+   
+       def tel_init(context: naga_context, p_geom: conf.Param_geom,
+           p_tel: conf.Param_tel, p_custom_pupil: conf.Param_custom_pupil
+            r0=None, ittime=None, p_wfss=None, dm=None):
+        """
+        Initialize the overall geometry of the AO system, including pupil and WFS
+
+        :parameters:
+        context: (naga_context) : context
+        ...
+        p_custom_pupil: (obj) : parameter class of custom pupil
+        ...
+        """
+        
+    and
+        
+       
+       def init_wfs_geom(p_wfs: conf.Param_wfs, r0: float, p_tel: conf.Param_tel,
+                  p_geom: conf.Param_geom,  p_custom_pupil: conf.Param_custom_pupil, 
+                  ittime: float, verbose=1):
+        
+        """Compute the geometry of WFSs: valid subaps, positions of the subaps,
+        flux per subap, etc...
+
+        :parameters:
+            p_wfs: (Param_wfs) : wfs settings
+            ...
+            p_custom_pupil: (obj) : parameter class of custom pupil
+            ...
+            verbose: (int) : (optional) display informations if 0
+        """
+        
+    Note that both function headers includes 
+    "p_custom_pupil: conf.Param_custom_pupil".
+        
+    Example of a function call: geom_init(p_geom, p_tel, p_custom_pupil.custom_pupil_path)
+    
+
+8. The next step is to change the function call of "tel_init()" ind "simulatorCE.py".
+
+
+        def _tel_init(self, r0: float, ittime: float) -> None:
+            """
+            Initializes the Telescope object in the simulator
+            """
+            self.tel = init.tel_init(self.c, self.config.p_geom, 
+                self.config.p_tel, self.config.p_custom_pupil ,r0,
+                                     ittime, self.config.p_wfss)       
+        
+   Here "self.config.p_custom_pupil" is the additional input parameter for the
+   parameter class of the custom pupil. Furthermore define the init-function for the custom pupil
+   in "SimulatorCE" 
+
+	
+   def _custom_pupil_init(self):
+        """
+        Initializes the import of a custom pupil
+        """           
+        if self.config.p_custom_pupil.import_pupil == True:
+        
+            print()
+            print("*-------------------------------")
+            print("IMPORT CUSTOM PUPIL")
+            print("status: enabled")
+            print("file name: %s" % (self.config.p_custom_pupil.custom_pupil_name))
+            print("file path: %s" % (self.config.p_custom_pupil.custom_pupil_path))
+            print("*-------------------------------")
+        
+        elif self.config.p_custom_pupil.import_pupil == False:
+            print()
+            print("*-------------------------------")
+            print("IMPORT CUSTOM PUPIL")
+            print("status: deactivated")
+            print("*-------------------------------")
+
+   and call the funtion in 
+
+   def init_sim(self) -> None:
+	...
+	self._custom_pupil_init()
+	...
+
+   
+9. The last step is to open the function "load_config_from_file" in SimulatorCE.py and add
+    
+	...
+	if not hasattr(sim_class.config, 'p_custom_pupil'):
+        	sim_class.config.p_custom_pupil = conf.Param_custom_pupil()  
+	...    
+    	s.t. if no paramter class was created in the config file, the simualtion will initialize a default parameter class. 
+    	
+
+10. Go to your config.-file in .../shesha/data/par/... and add the followinng
+   code:
+       
+        p_custom_pupil = conf.Param_custom_pupil()
+	p_custom_pupil.set_import_pupil(True, p_tel)
+	p_custom_pupil.set_custom_pupil_name('custom_pupil')
+	p_custom_pupil.set_custom_pupil_path('/home/.../custom_pupil.mat')
+	p_custom_pupil.set_show_pupil(True)
+
+   
+   Here  the first line initializes a new custum pupil paramter object. Second the import function is enabled 
+   and the aperture type is changegd. Note that the telescope object "p_tel" MUST be initilized BEFORE these commands.
+   Then the path to the .mat file is setted and also the name of the pupil in the .mat file. The last command determines
+   if the importetd pupil will be shwon.
+   
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%     

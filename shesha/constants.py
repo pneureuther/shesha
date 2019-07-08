@@ -145,6 +145,7 @@ class ApertureType:
     EELT_BP5 = b'EELT-BP5'
     EELT_CUSTOM = b'EELT-Custom'
     VLT = b'VLT'
+    CUSTOM_PUPIL = b'Custom-Pupil'
 
 
 class SpiderType:

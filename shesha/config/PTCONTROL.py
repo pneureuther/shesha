@@ -49,8 +49,12 @@ class Param_t_control:
         halfxy          List containing the halfxy for each wfs (every entry = 
                         halfxy for one wfs; list of np.ndarrays[dtype=np.float32])
         warnings        List containing all warnings raised during initialization
+        
+        NEW:
+        phase_arith_mean  np.array for determination of arithmatic mean of wfs
+        
         """
-        self.__os_dec = 0
+        self.__os_dec = 1
         self.__main_ctime = 0.0
         self.__sub_ctime = 0.0
         self.__loop_it = 0
@@ -67,7 +71,7 @@ class Param_t_control:
         self.__flux_per_sub = None
         self.__halfxy = None
         self.__warnings = []
-        
+        self.phase_arith_mean = 0
     
     #%%
     #################################################
@@ -589,6 +593,17 @@ class Param_t_control:
             raise TypeError("index for halfxy list-length.")
         
         return self.__halfxy[idx]
+
+    #%%
+    def set_phase_arith_mean(self, arth_mean_array):
+        """ Set matrix for arithmetic mean of wfs phase
+        
+        :parameters:
+            arth_mean_array: numpy.array of arithmetic mean
+        """
+        self.__phase_arith_mean = arth_mean_array
+        
+    phase_arith_mean = property(lambda x: x.__phase_arith_mean, set_phase_arith_mean)
     
     #%%
     # List containing all warnings raised during initialization

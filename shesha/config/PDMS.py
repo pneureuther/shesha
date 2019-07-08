@@ -97,7 +97,14 @@ class Param_dm:
 
         :param ap: (float) : TODO
         """
-        self.__ap = csu.enforce_float(ap)
+        if type(ap) != np.ndarray:
+            raise TypeError("ap must be a numpy.ndarray")
+        if len(ap.shape) != 2:
+            raise TypeError("ap must be a ndarray with exactly 2 dimensions")
+        if type(ap[0,0]) != np.float32:
+            raise TypeError("ap must be a ndarray containig np.float32 numbers")
+        
+        self.__ap = ap #csu.enforce_float(ap)
 
     ap = property(lambda x: x.__ap, set_ap)
 

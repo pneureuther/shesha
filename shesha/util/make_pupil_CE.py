@@ -1,3 +1,11 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Feb 14 12:56:07 2019
+
+@author: hadorn
+"""
+
 """
 Pupil creation functions
 """
@@ -8,12 +16,17 @@ import scipy.ndimage.interpolation as interp
 from . import hdf5_utils as h5u
 from . import utilities as util
 
+'neuer import don pupil_resize_fcn'
+
+import shesha.util.import_custom_pupil as cp
+
+
 from shesha.constants import ApertureType, SpiderType
 
 EELT_data = os.environ.get('SHESHA_ROOT') + "/data/apertures/"
 
 
-def make_pupil(dim, pupd, tel, xc=-1, yc=-1, real=0):
+def make_pupil(dim, pupd, tel, p_custom_pupil, xc=-1, yc=-1, real=0):
     """Initialize the system pupil
 
     :parameters:
@@ -31,6 +44,8 @@ def make_pupil(dim, pupd, tel, xc=-1, yc=-1, real=0):
         real: (int)
 
         cobs: (float) : central obstruction ratio.
+        
+        p_custom_pupil: (string) :  Parameterclass custom pupil
 
     TODO: complete
     """
@@ -63,6 +78,9 @@ def make_pupil(dim, pupd, tel, xc=-1, yc=-1, real=0):
     elif tel.type_ap == ApertureType.GENERIC:
         return make_pupil_generic(dim, pupd, tel.t_spiders, tel.spiders_type, xc, yc,
                                   real, tel.cobs)
+    elif tel.type_ap == ApertureType.CUSTOM_PUPIL:
+        print("Import custom pupil")
+        return cp.pupil_resize(dim, p_custom_pupil)
     else:
         raise NotImplementedError("Missing Pupil type.")
 
@@ -326,15 +344,10 @@ def make_phase_ab(dim, pupd, tel, pup):
 
     TODO: complete
     """
-    
-    'Um neuen Typ erweitern'
-    
-    if ((tel.type_ap == ApertureType.GENERIC) or (tel.type_ap == ApertureType.VLT)):
+
+    if ((tel.type_ap == ApertureType.GENERIC) or (tel.type_ap == ApertureType.VLT) or (tel.type_ap == ApertureType.CUSTOM_PUPIL)):
         return np.zeros((dim, dim)).astype(np.float32)
     
-    
-    '--------------'
-
     ab_file = EELT_data + "aberration_" + tel.type_ap.decode('UTF-8') + \
             "_N" + str(dim) + "_NPUP" + str(np.where(pup)[0].size) + "_CLOCKED" + str(
             tel.pupangle) + "_TSPIDERS" + str(

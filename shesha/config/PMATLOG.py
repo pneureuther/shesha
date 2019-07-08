@@ -29,6 +29,7 @@ class Param_mat_logger:
         mat_cmds        list of COMPASS commands used to retrieve desiered data
                         (list of strings)
         save_index      Index for mat-file-logging (int)
+        decimation_index      Index for saving iteration steps (int)
         """
         self.__log_mat = False
         self.__log_init = False
@@ -38,6 +39,7 @@ class Param_mat_logger:
         self.__mat_var = []
         self.__mat_cmds = []
         self.__save_index = 0
+        self.__decimation_index = 1
     
     
     #%%
@@ -66,7 +68,7 @@ class Param_mat_logger:
                                 logged in a mat-file
         """
         if type(init_bool) != bool:
-            raise TypeError("log_init must be a boolean (True or False)")
+            raise TypeError("log_init must be a boolean (True or False).")
         
         self.__log_init = init_bool
         
@@ -80,7 +82,7 @@ class Param_mat_logger:
             file_dir: (string) : directory of (to be created) mat-file
         """
         if type(file_dir) != str:
-            raise TypeError("mat_file_dir must be a string")
+            raise TypeError("mat_file_dir must be a string.")
         
         self.__mat_file_dir = file_dir
     
@@ -94,7 +96,7 @@ class Param_mat_logger:
             file_name: (string) : file-name of (to be created) mat-file
         """
         if type(file_name) != str:
-            raise TypeError("mat_file_name must be a string")
+            raise TypeError("mat_file_name must be a string.")
         
         self.__mat_file_name = file_name
     
@@ -108,9 +110,9 @@ class Param_mat_logger:
             num_dig: (int) : number of digits used in the mat-file variables
         """
         if type(num_dig) != int:
-            raise TypeError("mat_num_dig must be a POSITIVE integer")
+            raise TypeError("mat_num_dig must be a POSITIVE integer.")
         if num_dig <= 0:
-            raise TypeError("mat_num_dig must be a POSITIVE integer")
+            raise TypeError("mat_num_dig must be a POSITIVE integer.")
         
         self.__mat_num_dig = num_dig
     
@@ -125,11 +127,11 @@ class Param_mat_logger:
                                          created) mat-file
         """
         if (not mat_var) and (self.__log_mat):
-            raise TypeError("mat_var must be list of strings")
+            raise TypeError("mat_var must be list of strings.")
         
         for k in range(len(mat_var)):
             if type(mat_var[k]) != str:
-                raise TypeError("All elements of mat_var must be a string")
+                raise TypeError("All elements of mat_var must be a string.")
         
         self.__mat_var = mat_var
     
@@ -145,10 +147,10 @@ class Param_mat_logger:
         
         for k in range(len(mat_cmds)):
             if type(mat_cmds[k]) != str:
-                raise TypeError("All elements of mat_cmds must be a string")
+                raise TypeError("All elements of mat_cmds must be a string.")
         
         if (len(mat_cmds) != len(self.__mat_var)) and (self.__log_mat):
-            raise TypeError("mat_cmds and mat_var must be lists of the same length")
+            raise TypeError("mat_cmds and mat_var must be lists of the same length.")
         
         self.__mat_cmds = mat_cmds
     
@@ -169,3 +171,21 @@ class Param_mat_logger:
         self.__save_index = int(idx)
     
     save_index = property(lambda x: x.__save_index, set_save_index)
+    
+    #%%
+    def set_decimation_index(self, idx):
+        """ Decimation index for mat-file-logging
+        
+        :parameters:
+            idx: (integer) : Index for decimation of data
+        """
+        if (type(idx) != int) and (type(idx) != np.int64):
+            raise TypeError("decimation_index must be a positive integer.")
+        if idx < 0:
+            raise TypeError("decimation_index must be a positive integer.")
+        if idx == 0:
+            raise TypeError("decimation_index must be NON-ZERO")
+        
+        self.__decimation_index = int(idx)
+    
+    decimation_index = property(lambda x: x.__decimation_index, set_decimation_index)        

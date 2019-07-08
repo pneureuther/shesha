@@ -6,14 +6,14 @@ import shesha.config as conf
 import shesha.constants as scons
 from shesha.constants import CONST
 
-import shesha.util.make_pupil as mkP
+import shesha.util.make_pupil_CE as mkP
 import shesha.util.utilities as util
 from shesha.sutra_bind.wrap import naga_context, Telescope
 
 import numpy as np
 
 
-def tel_init(context: naga_context, p_geom: conf.Param_geom, p_tel: conf.Param_tel,
+def tel_init(context: naga_context, p_geom: conf.Param_geom, p_tel: conf.Param_tel, p_custom_pupil: conf.Param_custom_pupil,
              r0=None, ittime=None, p_wfss=None, dm=None):
     """
         Initialize the overall geometry of the AO system, including pupil and WFS
@@ -22,6 +22,7 @@ def tel_init(context: naga_context, p_geom: conf.Param_geom, p_tel: conf.Param_t
         context: (naga_context) : context
         p_geom: (Param_geom) : geom settings
         p_tel: (Param_tel) : telescope settings
+        p_custom_pupil: (Param_custom_pupil) : parameter class of custom pupil
         r0: (float) : atmos r0 @ 0.5 microns
         ittime: (float) : 1/loop frequency [s]
         p_wfss: (list of Param_wfs) : wfs settings
@@ -52,16 +53,16 @@ def tel_init(context: naga_context, p_geom: conf.Param_geom, p_tel: conf.Param_t
         print("*-----------------------")
         print("Computing geometry of WFS", indmax)
 
-        init_wfs_geom(p_wfss[indmax], r0, p_tel, p_geom, ittime, verbose=1)
+        init_wfs_geom(p_wfss[indmax], r0, p_tel, p_geom, p_custom_pupil, ittime, verbose=1)
         # #do the same for other wfs
         for i in range(nsensors):
             if (i != indmax):
                 print("*-----------------------")
                 print("Computing geometry of WFS", i)
-                init_wfs_geom(p_wfss[i], r0, p_tel, p_geom, ittime, verbose=1)
+                init_wfs_geom(p_wfss[i], r0, p_tel, p_geom, p_custom_pupil, ittime, verbose=1)
 
     else:
-        geom_init(p_geom, p_tel)
+        geom_init(p_geom, p_tel, p_custom_pupil)
 
     telescope = Telescope(context, p_geom._spupil.shape[0],
                           np.where(p_geom._spupil > 0)[0].size,
@@ -73,7 +74,7 @@ def tel_init(context: naga_context, p_geom: conf.Param_geom, p_tel: conf.Param_t
 
 
 def init_wfs_geom(p_wfs: conf.Param_wfs, r0: float, p_tel: conf.Param_tel,
-                  p_geom: conf.Param_geom, ittime: float, verbose=1):
+                  p_geom: conf.Param_geom,  p_custom_pupil: conf.Param_custom_pupil, ittime: float, verbose=1):
     """Compute the geometry of WFSs: valid subaps, positions of the subaps,
     flux per subap, etc...
 
@@ -85,6 +86,8 @@ def init_wfs_geom(p_wfs: conf.Param_wfs, r0: float, p_tel: conf.Param_tel,
         p_tel: (Param_tel) : telescope settings
 
         geom: (Param_geom) : geom settings
+        
+        p_custom_pupil: (Param_custom_pupil) : parameter class of custom pupil
 
         ittime: (float) : 1/loop frequency [s]
 
@@ -115,9 +118,9 @@ def init_wfs_geom(p_wfs: conf.Param_wfs, r0: float, p_tel: conf.Param_tel,
         p_geom.pupdiam = p_wfs._pdiam * p_wfs.nxsub
         print("pupdiam used: ", p_geom.pupdiam)
         if p_wfs.type == scons.WFSType.PYRHR:
-            geom_init(p_geom, p_tel, padding=p_wfs._nrebin)
+            geom_init(p_geom, p_tel, p_custom_pupil, padding=p_wfs._nrebin)
         else:
-            geom_init(p_geom, p_tel)
+            geom_init(p_geom, p_tel, p_custom_pupil)
 
     if (p_wfs.type == scons.WFSType.PYRHR):
         init_pyrhr_geom(p_wfs, r0, p_tel, p_geom, ittime, verbose=1)
@@ -135,7 +138,7 @@ def init_wfs_size(p_wfs: conf.Param_wfs, r0: float, p_tel: conf.Param_tel, verbo
         r0: (float) : atmos r0 @ 0.5 microns
 
         p_tel: (Param_tel) : telescope settings
-
+        
         verbose: (int) : (optional) display informations if 0
 
     Scheme to determine arrays sizes
@@ -684,15 +687,16 @@ def init_sh_geom(p_wfs: conf.Param_wfs, r0: float, p_tel: conf.Param_tel,
     if (verbose):
         print("nphotons : ", p_wfs._nphotons)
 
-
-def geom_init(p_geom: conf.Param_geom, p_tel: conf.Param_tel, padding=2):
+def geom_init(p_geom: conf.Param_geom, p_tel: conf.Param_tel, p_custom_pupil: conf.Param_custom_pupil, padding=2):
     """
         Initialize the system geometry
 
     :parameters:
         p_geom: (Param_geom) : geometry settings
         p_tel: (Param_tel) : telescope settings
+        p_custom_pupil: (Param_custom_pupil) : parameter class of custom pupil
         padding: (optional) : padding factor for PYRHR geometry
+        
     """
 
     # First power of 2 greater than pupdiam
@@ -710,10 +714,11 @@ def geom_init(p_geom: conf.Param_geom, p_tel: conf.Param_tel, padding=2):
     p_geom._n2 = p_geom._p2 + padding
 
     cent = p_geom.pupdiam / 2. + 0.5
-
+    
     # Useful pupil
-    p_geom._spupil = mkP.make_pupil(p_geom.pupdiam, p_geom.pupdiam, p_tel, cent,
-                                    cent).astype(np.float32)
+
+    p_geom._spupil = mkP.make_pupil(p_geom.pupdiam, p_geom.pupdiam, p_tel, p_custom_pupil ,cent, cent).astype(np.float32)
+
 
     p_geom._phase_ab_M1 = mkP.make_phase_ab(p_geom.pupdiam, p_geom.pupdiam, p_tel,
                                             p_geom._spupil).astype(np.float32)

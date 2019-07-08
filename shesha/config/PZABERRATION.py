@@ -32,9 +32,11 @@ class Param_z_aberration:
         zcube_spup      Cube of Zernike modes for spupil (scientific path/target)
                         (np.ndarray[ndim=3, dtype=np.float64)
         zcube_mpup      Cube of Zernike modes for mpupil (analytic path/WFS)
-                        (np.ndarray[ndim=3, dtype=np.float64)
-        coeff_series    Timeseries of Zernike coefficients without time stamps
-                        (np.ndarray[ndim=2, dtype=np.float64)
+                        (np.ndarray[ndim=3, dtype=np.float64)    
+        coeff_wfs       Timeseries of Zernike coefficients without time stamps 
+                        for wfs path (np.ndarray[ndim=2, dtype=np.float64)
+        coeff_sci       Timeseries of Zernike coefficients without time stamps 
+                        for science path (np.ndarray[ndim=2, dtype=np.float64)
         time_series     Time stamps (in seconds) of timeseries of Zernike
                         coefficients (np.ndarray[ndim=1, dtype=np.float64)
         include_path    Variable to define in which paths the aberrations are
@@ -46,7 +48,8 @@ class Param_z_aberration:
         mat_vers        Version of the mat-file containing the timeseries of 
                         Zernike coefficients (string)
         step            Time steps (in seconds) of time_series (float64)
-        var_name_coeff  Variable-name of coeff_series in mat-file (string)
+        var_name_c_wfs  Variable-name of coeff_wfs in mat-file (string)
+        var_name_c_sci  Variable-name of coeff_sci in mat-file (string)
         var_name_time   Variable-name of time_series in mat-file (string)
         diam_data       Diameter (in meter) of the aberrations stored in the 
                         mat-file (float)
@@ -66,12 +69,14 @@ class Param_z_aberration:
         self.__num_zpol = 0
         self.__zcube_spup = None
         self.__zcube_mpup = None
-        self.__coeff_series = None
+        self.__coeff_wfs = None
+        self.__coeff_sci = None
         self.__time_series = None
         self.__include_path = 0
         self.__mat_vers = "v7.3"
         self.__step = 0.0
-        self.__var_name_coeff = "coeff"
+        self.__var_name_c_wfs = "coeff_wfs"
+        self.__var_name_c_sci = "coeff_science"
         self.__var_name_time = "time"
         self.__diam_data = 0.0
         self.__pup_diam = -2.0
@@ -187,25 +192,50 @@ class Param_z_aberration:
     zcube_mpup = property(lambda x: x.__zcube_mpup, set_zcube_mpup)
     
     #%%
-    def set_coeff_series(self, coeff):
-        """ Set the timeseries of Zernike coefficients without time stamps
+    def set_coeff_wfs(self, coeff):
+        """ Set the timeseries of Zernike coefficients without time stamps for 
+        the wfs path
         
         :parameters:
             coeff: (np.ndarray[ndim=2, dtype=np.float64) : timeseries of Zernike
                                        coefficients without time
         """
         if type(coeff) != np.ndarray:
-            raise TypeError("coeff_series must be a numpy.ndarray")
+            raise TypeError("coeff_wfs must be a numpy.ndarray")
         if len(coeff.shape) != 2:
-            raise TypeError("coeff_series must be a ndarray with exactly 2 dimensions")
+            raise TypeError("coeff_wfs must be a ndarray with exactly 2 dimensions")
         if len(coeff[0,:]) != self.__num_zpol:
-            raise TypeError("coeff_series must be a ndarray whose second dimension has the same number of entries as num_zpol")
+            raise TypeError("coeff_wfs must be a ndarray whose second dimension has the same number of entries as num_zpol")
         if type(coeff[0,0]) != np.float64:
-            raise TypeError("coeff_series must be a ndarray containig np.float64 numbers")
+            raise TypeError("coeff_wfs must be a ndarray containig np.float64 numbers")
         
-        self.__coeff_series = coeff
+        self.__coeff_wfs = coeff
     
-    coeff_series = property(lambda x: x.__coeff_series, set_coeff_series)
+    coeff_wfs = property(lambda x: x.__coeff_wfs, set_coeff_wfs)
+    
+    #%%
+    def set_coeff_sci(self, coeff):
+        """ Set the timeseries of Zernike coefficients without time stamps for 
+        the science path
+        
+        :parameters:
+            coeff: (np.ndarray[ndim=2, dtype=np.float64) : timeseries of Zernike
+                                       coefficients without time
+        """
+        if type(coeff) != np.ndarray:
+            raise TypeError("coeff_sci must be a numpy.ndarray")
+        if len(coeff.shape) != 2:
+            raise TypeError("coeff_sci must be a ndarray with exactly 2 dimensions")
+        if len(coeff[0,:]) != self.__num_zpol:
+            raise TypeError("coeff_sci must be a ndarray whose second dimension has the same number of entries as num_zpol")
+        if len(coeff[:,0]) != len(self.coeff_wfs[:,0]):
+            raise TypeError("coeff_sci must be a ndarray whose first dimension has the same length as the first dimension of coeff_wfs")
+        if type(coeff[0,0]) != np.float64:
+            raise TypeError("coeff_sci must be a ndarray containig np.float64 numbers")
+        
+        self.__coeff_sci = coeff
+    
+    coeff_sci = property(lambda x: x.__coeff_sci, set_coeff_sci)
     
     #%%
     def set_time_series(self, time):
@@ -219,10 +249,10 @@ class Param_z_aberration:
             raise TypeError("time_series must be a numpy.ndarray")
         if len(time.shape) != 1:
             raise TypeError("time_series must be a ndarray with exactly 1 dimensions")
-        if time.size != len(self.coeff_series[:,0]):
-            raise TypeError("time_series must be a ndarray whose dimension has the same number of entries as num_zpol")
+        if time.size != len(self.coeff_wfs[:,0]):
+            raise TypeError("time_series must be a ndarray whose first dimension has the same length as the first dimension of coeff_wfs")
         if type(time[0]) != np.float64:
-            raise TypeError("coeff_series must be a ndarray containig np.float64 numbers")
+            raise TypeError("time_series must be a ndarray containig np.float64 numbers")
         
         self.__time_series = time
     
@@ -280,19 +310,33 @@ class Param_z_aberration:
     
     step = property(lambda x: x.__step, set_step)
     
-    #%%
-    def set_var_name_coeff(self, name):
-        """ Set the variable-name of coeff_series in mat-file
+    #%% 
+    def set_var_name_c_wfs(self, name):
+        """ Set the variable-name of coeff_wfs in mat-file
         
         :parameters:
-            name: (string) : variable-name of coeff_series in mat-file
+            name: (string) : variable-name of coeff_wfs in mat-file
         """
         if type(name) != str:
-            raise TypeError("var_name_coeff must be a string")
+            raise TypeError("var_name_c_wfs must be a string")
         
-        self.__var_name_coeff = name
+        self.__var_name_c_wfs = name
     
-    var_name_coeff = property(lambda x: x.__var_name_coeff, set_var_name_coeff)
+    var_name_c_wfs = property(lambda x: x.__var_name_c_wfs, set_var_name_c_wfs)
+    
+    #%% 
+    def set_var_name_c_sci(self, name):
+        """ Set the variable-name of coeff_sci in mat-file
+        
+        :parameters:
+            name: (string) : variable-name of coeff_sci in mat-file
+        """
+        if type(name) != str:
+            raise TypeError("var_name_c_sci must be a string")
+        
+        self.__var_name_c_sci = name
+    
+    var_name_c_sci = property(lambda x: x.__var_name_c_sci, set_var_name_c_sci)
     
     #%%
     def set_var_name_time(self, name):

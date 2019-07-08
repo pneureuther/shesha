@@ -10,9 +10,11 @@ import os
 import numpy as np
 import scipy.io as scio
 import hdf5storage
+import math
 
 #%%
 def calc_zcube(n_zpol, grid_p):
+    
     """
     Calculates a Cube of Zernike polynomials. The polynomials can be accessed
     with Z[k,:,:] and are sorted according to Noll convention.
@@ -26,11 +28,18 @@ def calc_zcube(n_zpol, grid_p):
         grid_p: (integer):   Number of grid points used for the Zernike polynomilas
 
     :return:
-        Z: (np.ndarray(ndim=3, dypte=np.float64)): Cube of Zernike modes
+        Z: (np.ndarray(ndim=3, dtype=np.float64)): Cube of Zernike modes
     
     :typical call:
         calc_zcube(n_zpol = self.config.p_z_ab.num_zpol, 
                    grid_p = self.config.p_geom._mpupil.shape[0])
+        
+    Update of function on Tue Feb  5 10:20:22 2019
+    
+    @author: hadorn
+    
+    - Every Zernicke polynomial can now be calculated 
+        
     """
     # check if gird_p is a positive int
     if (type(grid_p) != int) and (type(grid_p) != np.int64):
@@ -38,51 +47,63 @@ def calc_zcube(n_zpol, grid_p):
     if grid_p <= 0:
         raise TypeError("grid_p must be a POSITIVE integer.")
         
-    # check if enough Zernike polynomials are implemented
-    if n_zpol > 22:
-        raise NotImplementedError("There are only 22 Zernike polynomials implemented. " +
-                                  "Go to $SHESHA_ROOT/shesha/util/z_aberration.py and implement " + 
-                                  "more polynomials in the function calc_zcube.")
-    
-    # create Cartesian grid of needed size (number of grid points)
+   # create Cartesian grid of needed size (number of grid points)
     (x, y) = np.meshgrid(np.linspace(-1, 1, grid_p), np.linspace(-1, 1, grid_p))
-    
+
     # transform Cartesian to polar grid
     (r, phi) = cart2pol(x, y)
-    
+
     # allocate memory for evaluation of Zernike polynomials
     Z = np.zeros((n_zpol, grid_p, grid_p))
     
-    # string-array containing the Zernike polynomials (sort: Noll convention)
-    mat_cmds = ["Z[0,:,:] = np.ones((grid_p, grid_p))",
-                "Z[1,:,:] = 2 * r * np.cos(phi)",
-                "Z[2,:,:] = 2 * r * np.sin(phi)",
-                "Z[3,:,:] = np.sqrt(3) * (2*(r**2) - 1)",
-                "Z[4,:,:] = np.sqrt(6) * (r**2) * np.sin(2*phi)",
-                "Z[5,:,:] = np.sqrt(6) * (r**2) * np.cos(2*phi)",
-                "Z[6,:,:] = np.sqrt(8) * (3*(r**3) - 2*r) * np.sin(phi)",
-                "Z[7,:,:] = np.sqrt(8) * (3*(r**3) - 2*r) * np.cos(phi)",
-                "Z[8,:,:] = np.sqrt(8) * (r**3) * np.sin(3*phi)",
-                "Z[9,:,:] = np.sqrt(8) * (r**3) * np.cos(3*phi)",
-                "Z[10,:,:] = np.sqrt(5) * (6*(r**4) - 6*(r**2) + 1)",
-                "Z[11,:,:] = np.sqrt(10) * (4*(r**4) - 3*(r**2)) * np.cos(2*phi)",
-                "Z[12,:,:] = np.sqrt(10) * (4*(r**4) - 3*(r**2)) * np.sin(2*phi)",
-                "Z[13,:,:] = np.sqrt(10) * (r**4) * np.cos(4*phi)",
-                "Z[14,:,:] = np.sqrt(10) * (r**4) * np.sin(4*phi)",
-                "Z[15,:,:] = np.sqrt(12) * (10*(r**5) - 12*(r**3) + 3*r) * np.cos(phi)",
-                "Z[16,:,:] = np.sqrt(12) * (10*(r**5) - 12*(r**3) + 3*r) * np.sin(phi)",
-                "Z[17,:,:] = np.sqrt(12) * (5*(r**5) - 4*(r**3)) * np.cos(3*phi)",
-                "Z[18,:,:] = np.sqrt(12) * (5*(r**5) - 4*(r**3)) * np.sin(3*phi)",
-                "Z[19,:,:] = np.sqrt(12) * (r**5) * np.cos(5*phi)",
-                "Z[20,:,:] = np.sqrt(12) * (r**5) * np.sin(5*phi)",
-                "Z[21,:,:] = np.sqrt(7) * (20*(r**6) - 30*(r**4) + 12*(r**2) - 1)"]
-    
-    # evaluation of the needed Zernike polynomials
-    for k in range(n_zpol):
-        exec(mat_cmds[k])
+    # define first row of 'cube' of Zernike coeffs
+    Z[0,:,:] = np.ones((grid_p, grid_p))
+        
+    # iteration for computing all Zernike coefficents
+    for zpol in range(1,n_zpol+1):
+            
+        # determine for noll indicies 
+        n,m = Noll2NMindex(zpol)
+        
+        # iteration for Zernike coeffs does only allow n,m as nonnegativ integers. 
+        # If m is smaller than zero, the sign of m has to be changed
+        if m < 0:
+            m = -m 
+        
+        # initialize coefficient
+        R = 0
+        
+        # iteration for the zpol-th Zernike coefficient  
+        for k in range(0,int((n-m)/2)+1):
+            
+            # sum computationally regulations of Zernike coefficients
+            R += pow(-1,k) * binomial(n-k, k) * binomial(n-2*k, (n-m)/2-k) * np.power(r, n-2*k) 
+                    
+        # determine normalization factor for Zernike coefficient
+        N = 0
+        
+        # calculate normation based on m -> kronecker delta function
+        if m == 0:
+            N = math.sqrt(2*(n+1)/2)    
+        else:
+            N = math.sqrt(2*(n+1))
+        
+        # check if current calculated zernike polynom is even or odd and if m is equals zero 
+        # and determine the Zernike Polynomial
+        if (zpol % 2) == 0 and zpol != 1:
+            
+            Z[zpol-1,:,:] = N*R*np.cos(m*phi)
+            
+        elif m == 0:
+            
+            Z[zpol-1,:,:] = N*R
+        
+        elif (zpol % 2) != 0 and zpol != 1:
+                   
+            Z[zpol-1,:,:] = N*R*np.sin(m*phi)
     
     return Z
-
+    
 #%%
 def load_variable(f_dir, f_name, mat_ver, var_name):
     """
@@ -100,10 +121,10 @@ def load_variable(f_dir, f_name, mat_ver, var_name):
                                    coefficients without time stamps
     
     :typical call:
-    load_coeff_series(f_dir = self.config.p_z_ab.file_dir,
-                      f_name = self.config.p_z_ab.file_name,
-                      mat_ver = self.config.p_z_ab.mat_vers,
-                      var_name = self.config.p_z_ab.var_name_coeff *OR* var_name_time)
+    load_variable(f_dir = self.config.p_z_ab.file_dir,
+                  f_name = self.config.p_z_ab.file_name,
+                  mat_ver = self.config.p_z_ab.mat_vers,
+                  var_name = self.config.p_z_ab.var_name_c_xxx *OR* var_name_time)
     """
     # load mat-file via scipy.io
     if mat_ver in ["v4", "v6", "v7"]:
@@ -239,7 +260,7 @@ def calc_phase_screen(cube, coeff, n_zpol):
     
     :typical call:
         calc_phase_screen(cube = self.config.p_z_ab.zcube_spup *OR* zcube_mpup,
-                          coeff = self.config.p_z_ab.coeff_series[0,:],
+                          coeff = self.config.p_z_ab.coeff_xxx[0,:],
                           n_zpol = self.config.p_z_ab.num_zpol)
     """
     # check if number of coefficients and Zernike polynomials is equal
@@ -322,7 +343,7 @@ def init_z_aber(sim):
             # calculate cube of untruncated Zernike polynomials (size of data)
             zcube_untrunc = calc_zcube(
                     n_zpol = sim.config.p_z_ab.num_zpol, 
-                    grid_p = diam_data_pix )
+                    grid_p = diam_data_pix)
             
             # aberration is LARGER than mpupil
             if diam_data_pix > sim.config.p_geom._n:
@@ -361,7 +382,7 @@ def init_z_aber(sim):
             # calculate cube of untruncated Zernike polynomials (size of data)
             zcube_untrunc = calc_zcube(
                     n_zpol = sim.config.p_z_ab.num_zpol, 
-                    grid_p = sim.config.p_geom._n )
+                    grid_p = sim.config.p_geom._n)
             
             # Calculate matrix-padding on one side (spupil)
             pix_diff_sp = np.int((sim.config.p_geom._n - sim.config.p_geom.pupdiam) / 2)
@@ -377,12 +398,18 @@ def init_z_aber(sim):
         else:
             raise TypeError("pup_diam must be a float >0. or =-1. or =-2.")
         
-        # load timeseries of Zernike coefficients (coeff_series) from mat-file
-        sim.config.p_z_ab.set_coeff_series( load_variable(
+        # load timeseries of Zernike coefficients (coeff_wfs and coeff_sci) from mat-file
+        sim.config.p_z_ab.set_coeff_wfs( load_variable(
                 f_dir = sim.config.p_z_ab.file_dir,
                 f_name = sim.config.p_z_ab.file_name,
                 mat_ver = sim.config.p_z_ab.mat_vers,
-                var_name = sim.config.p_z_ab.var_name_coeff) )
+                var_name = sim.config.p_z_ab.var_name_c_wfs) )
+        
+        sim.config.p_z_ab.set_coeff_sci( load_variable(
+                f_dir = sim.config.p_z_ab.file_dir,
+                f_name = sim.config.p_z_ab.file_name,
+                mat_ver = sim.config.p_z_ab.mat_vers,
+                var_name = sim.config.p_z_ab.var_name_c_sci) )
         
         # load time stamps coefficients (time_series) from mat-file
         sim.config.p_z_ab.set_time_series( load_variable(
@@ -405,14 +432,14 @@ def init_z_aber(sim):
         if (sim.config.p_z_ab.include_path == 1) or (sim.config.p_z_ab.include_path == 3):
             sim.tel.set_phase_ab_M1( calc_phase_screen(
                     cube = sim.config.p_z_ab.zcube_spup,
-                    coeff = sim.config.p_z_ab.coeff_series[0,:],
+                    coeff = sim.config.p_z_ab.coeff_sci[0,:],
                     n_zpol = sim.config.p_z_ab.num_zpol) )
         
         # calculate and set phase-screen for mpupil
         if (sim.config.p_z_ab.include_path == 2) or (sim.config.p_z_ab.include_path == 3):
             sim.tel.set_phase_ab_M1_m( calc_phase_screen(
                     cube = sim.config.p_z_ab.zcube_mpup,
-                    coeff = sim.config.p_z_ab.coeff_series[0,:],
+                    coeff = sim.config.p_z_ab.coeff_wfs[0,:],
                     n_zpol = sim.config.p_z_ab.num_zpol) ) 
         
         # print status of aberrations
@@ -451,3 +478,56 @@ def init_z_aber(sim):
         print("CUSTOM ZERNIKE ABERRATIONS")
         print("status: disabled")
         print("*-------------------------------")
+        
+#%%
+def binomial(n, k):
+    """
+    A fast way to calculate binomial coefficients by Andrew Dalke.
+    See http://stackoverflow.com/questions/3025162/statistics-combinations-in-python
+    
+    parameters:
+        n: (integer) : binomial coefficient
+        k: (integer) : binomial coefficient
+    """
+    
+    if 0 <= k <= n:
+        ntok = 1
+        ktok = 1
+        
+        # convert k and n to integer
+        n = int(n)
+        k = int(k) 
+        
+        for t in range(1, min(k, n - k) + 1):
+            ntok *= n
+            ktok *= t
+            n -= 1
+        return ntok // ktok
+    else:
+        return 0
+
+#%%
+def Noll2NMindex(j):
+    """
+    Converts Noll index to n-m-index
+    
+    parameters:
+        j: (integer) : Noll's index)
+    """
+    
+    n = np.floor( np.sqrt(2*j - 1) + 0.5 ) - 1;
+
+    # calcualte absolute value of azimuthal index
+    if np.mod(n,2) == 0:
+        # even radial index
+        m = 2 * np.floor( (2*j + 1 - n*(n+1)) / 4 );
+    else:
+        # odd radial index
+        m = 2 * np.floor( (2*(j + 1) - n*(n+1)) / 4 ) - 1 ;
+
+
+    # set sign of azimuthal index
+    if np.mod(j,2) != 0:
+        m = -m;
+
+    return n,m        

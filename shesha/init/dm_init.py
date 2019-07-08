@@ -375,8 +375,8 @@ def init_pzt_from_hdf5(p_dm: conf.Param_dm, p_geom: conf.Param_geom, diam: float
     print("Actuator number in H5 data : ", ninflu)
     p_dm._ntotact = np.int(ninflu)
 
-    x = np.arange(influ_size_h5) * res_h5_m * (diam / diam_dm_h5[0])
-    y = np.arange(influ_size_h5) * res_h5_m * (diam / diam_dm_h5[1])
+    x = np.arange(influ_size_h5) * res_h5_m * (diam_dm_pup_h5[0] / diam_dm_h5[0]) # (diam / diam_dm_h5[0])
+    y = np.arange(influ_size_h5) * res_h5_m * (diam_dm_pup_h5[0] / diam_dm_h5[1]) # (diam / diam_dm_h5[1])
     xmax = max(x)
     ymax = max(y)
     xnew = np.arange(0, xmax, res_compass)

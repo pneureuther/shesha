@@ -11,22 +11,20 @@ import os
 import hdf5storage
 
 
-def mat_file_init(log_mat, mat_file_name, mat_file_dir, mat_var, bool_log_init):
+def mat_file_init(matlog_object):
     """
     Initializes the logging of variables in a mat-file
     
     :parameters:
-        log_mat: (bool) : variables are saved to mat-file if true
-            = self.config.p_loop.log_mat
-        mat_file_name: (string) : file-name of mat-file
-            = self.config.p_loop.mat_file_name
-        mat_file_dir: (string) : directory of mat-file
-            = self.config.p_loop.mat_file_dir
-        mat_var: (list of strings) : list of variable names used in mat-file
-            = self.config.p_loop.mat_var
-        bool_log_init: (bool) : variables after initialization are saved
-            = self.config.p_loop.log_init
+       matlog_object (Parameter class) : class of Param_mat_logger
     """
+    # assignments of attributes of matlog_object
+    log_mat = matlog_object.log_mat
+    mat_file_name = matlog_object.mat_file_name
+    mat_file_dir = matlog_object.mat_file_dir
+    mat_var = matlog_object.mat_var
+    bool_log_init = matlog_object.log_init
+    decimation_idx = matlog_object.decimation_index
     
     # Initialize File
     if log_mat:
@@ -34,10 +32,17 @@ def mat_file_init(log_mat, mat_file_name, mat_file_dir, mat_var, bool_log_init):
         print("*-------------------------------")
         print("DATA-LOGGING")
         print("status: enabled")
+            
         if bool_log_init:
             print("log init-values: enabled")
         else:
             print("log init-values: disabled")
+            
+        # check if decimation of data was setted in config nad display the information
+        if decimation_idx != 1:
+             print("Every %s. iteration step will be saved " % decimation_idx)
+        else:
+            print('No decimation index -> Every iteration will be saved')    
         
         # create complete file-name
         mat_file = mat_file_dir + mat_file_name
@@ -61,7 +66,7 @@ def mat_file_init(log_mat, mat_file_name, mat_file_dir, mat_var, bool_log_init):
         else:
             print("%s created" % mat_file_name)
             print("file location: %s" % mat_file)
-        
+            
         # create EMPTY mat-file
         hdf5storage.savemat(mat_file, {}, appendmat = False, format = '7.3',
                             action_for_matlab_incompatible = 'error')
@@ -82,27 +87,25 @@ def mat_file_init(log_mat, mat_file_name, mat_file_dir, mat_var, bool_log_init):
         print("*-------------------------------")
         print()
         
-def mat_file_write(log_mat, mat_file_name, mat_file_dir, mat_num_dig,
-                   mat_var, mat_cmds, index, sim):
+
+def mat_file_write(matlog_object, index, sim):
     """
     Writes new data to the specified mat-file
     
     :parameters:
-        log_mat: (bool) : variables are saved to mat-file if true
-            = self.config.p_loop.log_mat
-        mat_file_name: (string) : file-name of mat-file
-            = self.config.p_loop.mat_file_name
-        mat_file_dir: (string) : directory of mat-file
-            = self.config.p_loop.mat_file_dir
-        mat_num_dig: (int) : number of digits used in the mat-file variables
-            = self.config.p_loop.mat_num_dig
-        mat_var: (list of strings) : list of variable names used in mat-file
-            = self.config.p_loop.mat_var
-        mat_cmds: (list of strings) : list of COMPASS commands used to retrievedesiered data
-            = self.config.p_loop.mat_cmds
+        
+        matlog_object (Parameter class) : class of Param_mat_logge
         index: (int) : iteration index of optical calculation
+        sim (class sim) : simulation object
     """
     
+    # assignments
+    mat_file_name = matlog_object.mat_file_name
+    mat_file_dir = matlog_object.mat_file_dir
+    mat_num_dig = matlog_object.mat_num_dig
+    mat_var = matlog_object.mat_var
+    mat_cmds = matlog_object.mat_cmds
+
     # Creating a list of strings:
     # ["Alpha001", "Bravo001", etc.] (mat_var with appended index)
     num_setting = '{:0%d}' % mat_num_dig
